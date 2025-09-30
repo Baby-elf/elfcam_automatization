@@ -1,0 +1,10 @@
+# Google Drive / OAuth
+google-api-python-client>=2.139.0
+google-auth>=2.34.0
+google-auth-oauthlib>=1.2.1
+google-auth-httplib2>=0.2.0
+httplib2>=0.22.0
+
+# 常用工具
+requests>=2.32.3
+tqdm>=4.66.4
