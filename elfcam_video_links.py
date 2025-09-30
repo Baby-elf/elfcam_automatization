@@ -52,7 +52,7 @@ print("CSV :", csv_path)
 print("MD  :", md_path)
 print("HTML:", html_path)
 
-upload_file(folder_name= "elfcam_video_link", mypath= OUTDIR, fn="elfcams_video_links_{ts}.html")
+upload_file(folder_name= "elfcam_video_link", mypath= OUTDIR, fn=f"elfcams_video_links_{ts}.html")
 
 print("elfcams_video_links_{ts}.html上传完成")
 #upload_file(folder_name= "elfcam_video_link", mypath= "videolinks", fn="a.html")
