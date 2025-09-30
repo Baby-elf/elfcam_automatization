@@ -5,7 +5,7 @@ from utils.google_drive import upload_file, cleanup_expired_files
 
 # —— 基本参数 —— #
 ROOT_DIR = "/var/www/elfcams/videos"                        # 递归扫描的本地目录
-BASE = "https://elfcams.com/wp-content/uploads/videos"      # 访问前缀
+BASE = "https://elfcams.com/videos"      # 访问前缀
 OUTDIR = os.environ.get("OUTDIR", os.path.expanduser("~/elfcam_automatisation/videolinks/"))
 from zoneinfo import ZoneInfo
 
@@ -60,5 +60,5 @@ upload_file(folder_name= "elfcam_video_link", mypath= OUTDIR, fn=f"elfcams_video
 
 cleanup_expired_files(keep_latest=3)
 
-#print(f"elfcams_video_links_{ts}.html上传完成")
+print(f"elfcams_video_links_{ts}.html上传完成")
 #upload_file(folder_name= "elfcam_video_link", mypath= "videolinks", fn="a.html")
