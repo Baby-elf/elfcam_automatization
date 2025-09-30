@@ -7,9 +7,11 @@ from utils.google_drive import upload_file
 ROOT_DIR = "/var/www/elfcams/videos"                        # 递归扫描的本地目录
 BASE = "https://elfcams.com/wp-content/uploads/videos"      # 访问前缀
 OUTDIR = os.environ.get("OUTDIR", os.path.expanduser("~/elfcam_automatisation/videolinks/"))
+from zoneinfo import ZoneInfo
 
+paris_tz = ZoneInfo("Europe/Paris")
 # 时间戳（例：20250930-154512）
-ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+ts = datetime.now(paris_tz).strftime("%Y%m%d-%H:%M:%S")
 
 # 支持的视频后缀
 exts = {'.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv'}
@@ -54,5 +56,5 @@ print("HTML:", html_path)
 
 upload_file(folder_name= "elfcam_video_link", mypath= OUTDIR, fn=f"elfcams_video_links_{ts}.html")
 
-print("elfcams_video_links_{ts}.html上传完成")
+print(f"elfcams_video_links_{ts}.html上传完成")
 #upload_file(folder_name= "elfcam_video_link", mypath= "videolinks", fn="a.html")
