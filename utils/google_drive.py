@@ -204,3 +204,45 @@ def upload_file(
     except Exception as e:
         logging.error(f"发生错误: {e}")
         return None
+
+def cleanup_expired_files(folder_name = "elfcam_video_link", keep_latest: int = 10):
+    """
+    清理 Google Drive 文件夹中过期文件，只保留最新 keep_latest 个。
+    排序规则：按文件创建时间（newest first）。
+    """
+    drive_service = google_auth()
+
+    q = f"mimeType = 'application/vnd.google-apps.folder' and name = '{folder_name}' and trashed = false"
+    folder_list = drive_service.files().list(q=q, fields="files(id, name)").execute()
+    files = folder_list.get("files", [])
+
+    if not files:
+        folder_metadata = {
+            "name": folder_name,
+            "mimeType": "application/vnd.google-apps.folder",
+        }
+        folder = drive_service.files().create(body=folder_metadata, fields="id,name").execute()
+        folder_name_id = folder["id"]
+        logging.info(f"未找到文件夹，已创建：'{folder_name}'，ID: {folder_name_id}")
+    else:
+        folder_name_id = files[0]["id"]
+        logging.info(f"找到文件夹 '{folder_name}'，ID: {folder_name_id}")
+
+
+    results = drive_service.files().list(
+        q=f"'{folder_name_id}' in parents and trashed=false",
+        fields="files(id, name, createdTime)",
+        orderBy="createdTime desc"
+    ).execute()
+    files = results.get("files", [])
+
+    if len(files) > keep_latest:
+        expired = files[keep_latest:]
+        for f in expired:
+            fid, fname = f["id"], f["name"]
+            logging.info(f"删除过期文件: {fname} ({fid})")
+            try:
+                drive_service.files().delete(fileId=fid).execute()
+            except Exception as e:
+                logging.error(f"删除文件失败 {fname}: {e}")
+
