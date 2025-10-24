@@ -186,7 +186,24 @@ def main():
                     tt_id = ensure_brand_term(cur, brand_name)
                     attach_brand_to_post(cur, target_post_id, tt_id)
                 conn.commit()
-                print("写入并提交完成。")
+                # 写入完成后查询实际写入结果
+                print("\n写入后的实际 meta:")
+                metas = fetch_meta(cur, target_post_id)
+                for mk, mv in metas.items():
+                    print(f"  {mk} = {mv}")
+
+                if brand_name:
+                    tt_id = ensure_brand_term(cur, brand_name)
+                    cur.execute("""
+                        SELECT t.name
+                        FROM wp_terms t
+                        JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id
+                        JOIN wp_term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                        WHERE tr.object_id=%s AND tt.taxonomy='brand'
+                    """, (target_post_id,))
+                    brands = [r['name'] for r in cur.fetchall()]
+                    print("写入后的品牌:", brands)
+
             except Exception as e:
                 conn.rollback()
                 print("写入时发生异常，已回滚。错误：", e)
