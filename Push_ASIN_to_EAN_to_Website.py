@@ -115,7 +115,7 @@ def main():
     asin_to_ean_table = asin_to_ean[1:]
     index_dict = {r:i for i,r in enumerate(index)}
 
-    for row in asin_to_ean_table[:32]:
+    for row in asin_to_ean_table:
         WEBSITE_ID = row[index_dict.get("website_id")]
         ASIN = row[index_dict.get("asin")]
         EAN = row[index_dict.get("ean")]
