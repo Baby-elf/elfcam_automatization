@@ -31,13 +31,14 @@ APPLY = False
 # 要写入的新值（只写入非空字段）
 # meta keys 会被写入： _asin, _ean, _goods_code, _fnsku, _weight
 NEW_VALUES = {
-    'asin': '',   # e.g. 'B08HXBFQBN'
-    'ean':  '',   # e.g. '3760325007760'
-    'goods_code': '',
-    'fnsku': '',
-    'weight': '',
-    'brand': ''   # 若需写 brand taxonomy，填名称（例如 'ELFCAM'），否则留空
+    'asin': 'B08HXBFQBN',
+    'ean':  '3760325007760',
+    'goods_code': 'Attenuator-FCU-2pcs___1dB',
+    'fnsku': 'X0018N3Q61',
+    'weight': '9',       # 或你实际的重量
+    'brand': 'ELFCAM'    # 如果你想写 brand
 }
+
 
 # ----------------------------
 # 以下通常不用修改
