@@ -8,3 +8,7 @@ httplib2>=0.22.0
 # 常用工具
 requests>=2.32.3
 tqdm>=4.66.4
+oauth2client
+pandas
+numpy
+barcode
