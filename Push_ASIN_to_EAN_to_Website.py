@@ -26,7 +26,7 @@ DB_CHARSET = 'utf8mb4'
 WEBSITE_ID = "2627_2628"   # <-- 把要测试/更新的 website_id 填在这里
 
 # 是否真正写入数据库（False = dry-run，仅显示；True = apply）
-APPLY = False
+APPLY = True
 
 # 要写入的新值（只写入非空字段）
 # meta keys 会被写入： _asin, _ean, _goods_code, _fnsku, _weight
