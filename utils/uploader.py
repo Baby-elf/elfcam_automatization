@@ -11,7 +11,7 @@ logging.basicConfig(
 )
 
 # 获取认证和客户端的公共函数
-def get_google_client(google_drive_api='credentials/google-sheet-api.json'):
+def get_google_client(google_drive_api='utils/google-drive-api/google-sheet-api.json'):
     scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
     credentials = ServiceAccountCredentials.from_json_keyfile_name(google_drive_api, scope)
