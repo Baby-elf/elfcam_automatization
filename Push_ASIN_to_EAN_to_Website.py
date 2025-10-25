@@ -238,14 +238,69 @@ def main():
                 if REPLACE_CATEGORIES:
                     remove_product_cat_relationships(cur, target_post_id)
 
-                # 创建 / 获取 category / sub-category term_taxonomy_id
+                # 创建 / 获取 category / sub-category term_taxonomy_id（带 debug）
                 cat_tt = None
+                cat_term_id = None
                 if CATEGORY:
-                    cat_tt = ensure_category_term(cur, CATEGORY)
+                    # 先查或创建 term（并取 term_id）
+                    cur.execute("SELECT term_id FROM wp_terms WHERE name=%s LIMIT 1", (CATEGORY,))
+                    rowt = cur.fetchone()
+                    if rowt:
+                        cat_term_id = rowt['term_id']
+                        print(f"  [DEBUG] found CATEGORY term_id={cat_term_id} for '{CATEGORY}'")
+                    else:
+                        slug = CATEGORY.lower().replace(' ', '-')
+                        cur.execute("INSERT INTO wp_terms (name, slug) VALUES (%s, %s)", (CATEGORY, slug))
+                        cat_term_id = cur.lastrowid
+                        print(f"  [DEBUG] created CATEGORY term_id={cat_term_id} for '{CATEGORY}'")
+
+                    # 查或创建 term_taxonomy（product_cat）
+                    cur.execute(
+                        "SELECT term_taxonomy_id, parent FROM wp_term_taxonomy WHERE term_id=%s AND taxonomy='product_cat' LIMIT 1",
+                        (cat_term_id,))
+                    rtt = cur.fetchone()
+                    if rtt:
+                        cat_tt = rtt['term_taxonomy_id']
+                        print(f"  [DEBUG] found CATEGORY term_taxonomy_id={cat_tt} parent={rtt.get('parent')}")
+                    else:
+                        cur.execute(
+                            "INSERT INTO wp_term_taxonomy (term_id, taxonomy, description, parent, count) VALUES (%s,'product_cat','',0,0)",
+                            (cat_term_id,))
+                        cat_tt = cur.lastrowid
+                        print(f"  [DEBUG] created CATEGORY term_taxonomy_id={cat_tt}")
+
                 if SUB_CATEGORY:
-                    sub_tt = ensure_category_term(cur, SUB_CATEGORY, parent_tt_id=cat_tt)
+                    # 同样处理子分类，并把 parent 写为 cat_term_id（term_id）
+                    cur.execute("SELECT term_id FROM wp_terms WHERE name=%s LIMIT 1", (SUB_CATEGORY,))
+                    rowt = cur.fetchone()
+                    if rowt:
+                        sub_term_id = rowt['term_id']
+                        print(f"  [DEBUG] found SUB_CATEGORY term_id={sub_term_id} for '{SUB_CATEGORY}'")
+                    else:
+                        slug = SUB_CATEGORY.lower().replace(' ', '-')
+                        cur.execute("INSERT INTO wp_terms (name, slug) VALUES (%s, %s)", (SUB_CATEGORY, slug))
+                        sub_term_id = cur.lastrowid
+                        print(f"  [DEBUG] created SUB_CATEGORY term_id={sub_term_id} for '{SUB_CATEGORY}'")
+
+                    cur.execute(
+                        "SELECT term_taxonomy_id, parent FROM wp_term_taxonomy WHERE term_id=%s AND taxonomy='product_cat' LIMIT 1",
+                        (sub_term_id,))
+                    rtt = cur.fetchone()
+                    if rtt:
+                        sub_tt = rtt['term_taxonomy_id']
+                        print(f"  [DEBUG] found SUB_CATEGORY term_taxonomy_id={sub_tt} parent={rtt.get('parent')}")
+                    else:
+                        # 注意这里 parent 我们传 cat_term_id（term_id）
+                        cur.execute(
+                            "INSERT INTO wp_term_taxonomy (term_id, taxonomy, description, parent, count) VALUES (%s,'product_cat','',%s,0)",
+                            (sub_term_id, cat_term_id or 0))
+                        sub_tt = cur.lastrowid
+                        print(f"  [DEBUG] created SUB_CATEGORY term_taxonomy_id={sub_tt} parent_term_id={cat_term_id}")
+
+                    print(f"  [DEBUG] about to attach sub_tt={sub_tt} to post_id={target_post_id}")
                     attach_term_to_post(cur, target_post_id, sub_tt)
                 elif cat_tt:
+                    print(f"  [DEBUG] about to attach cat_tt={cat_tt} to post_id={target_post_id}")
                     attach_term_to_post(cur, target_post_id, cat_tt)
 
                 conn.commit()
