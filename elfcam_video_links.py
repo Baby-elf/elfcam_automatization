@@ -6,7 +6,7 @@ from utils.google_drive import upload_file, cleanup_expired_files
 # —— 基本参数 —— #
 ROOT_DIR = "/var/www/elfcams/videos"                        # 递归扫描的本地目录
 BASE = "https://elfcams.com/videos"      # 访问前缀
-OUTDIR = os.environ.get("OUTDIR", os.path.expanduser("~/elfcam_automatisation/videolinks/"))
+OUTDIR = os.environ.get("OUTDIR", os.path.expanduser("~/elfcam_automatization/videolinks/"))
 from zoneinfo import ZoneInfo
 
 paris_tz = ZoneInfo("Europe/Paris")
