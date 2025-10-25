@@ -229,73 +229,125 @@ def main():
     orders = read_csv_by_sheet("Website-Price", "order")
     index_dict_order = {r:i for i, r in enumerate(orders[0])}
     order_dict = {r[index_dict_order["catalog_ss_item"]]: r[index_dict_order["catalog_ss_subgroup"]] + "-" + r[index_dict_order["catalog_ss_group"]] for r in orders[1:]}
-    print("\n=== PHASE 2: cat / subcat 写入到变体 ===")
-    for row in rows[:32]:
+    print("\n=== PHASE 2: cat / subcat 写入到变体/单体（meta + optional taxonomy） ===")
 
-        WEBSITE_ID = row[index_dict.get("id")]
-        SUBCAT =  row[index_dict.get("category")]
-        CAT = order_dict.get(SUBCAT)
+    # quick sanity checks
+    print("DEBUG: rows count =", len(rows))
+    if len(rows) == 0:
+        print("DEBUG: No rows found in Website-Price sheet. Check read_csv_by_sheet result and sheet name.")
+    for i, r in enumerate(rows[:3]):
+        print(f"DEBUG sample row {i} keys/len: {len(r)}; preview: {r[:5] if isinstance(r, (list, tuple)) else r}")
 
+    # ensure index keys exist
+    if "id" not in index_dict or "category" not in index_dict:
+        print("ERROR: expected 'id' or 'category' column missing in Website-Price sheet header:", website_price[0])
+    else:
+        print("DEBUG: index_dict has id and category indices:", index_dict["id"], index_dict["category"])
 
-        if not WEBSITE_ID:
-            print("[SKIP] missing WEBSITE_ID, skip row")
-            continue
-
-
-        if not CAT and not SUBCAT:
-            continue
-
-        target_post_id, is_variation = parse_website_id(WEBSITE_ID)
-        if target_post_id is None:
-            print(f"[ERROR] invalid WEBSITE_ID: {WEBSITE_ID}")
-            continue
-
-        # 输出信息
-        print(f"[PH2] post_id={WEBSITE_ID} cat='{CAT}' subcat='{SUBCAT}'")
-
-        if not APPLY:
-            print("  [DRY-RUN] PH2 not applied.")
-            continue
-
-        conn = get_conn()
+    # loop
+    for idx, row in enumerate(rows[:32], 1):
         try:
-            with conn.cursor() as cur:
-                # 检查 post 是否存在
+            WEBSITE_ID = row[index_dict.get("id")]
+            SUBCAT = row[index_dict.get("category")]
+            CAT = order_dict.get(SUBCAT)
+
+            print(f"\n[PH2 #{idx}] raw WEBSITE_ID={WEBSITE_ID!r}, SUBCAT={SUBCAT!r}, mapped CAT={CAT!r}")
+
+            if not WEBSITE_ID:
+                print("  [SKIP] missing WEBSITE_ID, skip row")
+                continue
+
+            if not CAT and not SUBCAT:
+                print("  [SKIP] both CAT and SUBCAT empty, nothing to do")
+                continue
+
+            target_post_id, is_variation = parse_website_id(WEBSITE_ID)
+            print(f"  parsed -> target_post_id={target_post_id}, is_variation={is_variation}")
+            if target_post_id is None:
+                print(f"  [ERROR] invalid WEBSITE_ID format: {WEBSITE_ID!r}")
+                continue
+
+            if not APPLY:
+                print("  [DRY-RUN] PH2 not applied.")
+                continue
+
+            conn = get_conn()
+            cur = conn.cursor()
+            try:
                 post_row = get_post_row(cur, target_post_id)
                 if not post_row:
-                    print(f"  [ERROR] post {WEBSITE_ID} not found.")
+                    print(f"  [ERROR] post {target_post_id} not found in wp_posts")
+                    cur.close()
+                    conn.close()
                     continue
 
-                # 如果是变体，只更新变体本身
-                if post_row.get('post_type') == 'product_variation':
-                    if CAT:
-                        upsert_meta(cur, target_post_id, '_cat', CAT)
-                    if SUBCAT:
-                        upsert_meta(cur, target_post_id, '_subcat', SUBCAT)
-                    print(f"  [PH2 OK] Updated variation {target_post_id} meta: _cat={CAT}, _subcat={SUBCAT}")
-                else:
-                    print(f"  [INFO] post {target_post_id} is not a variation, skip.")
+                # 写 meta（写到该 post，不区分 simple/variation）
+                if CAT:
+                    print(f"  upsert_meta: _cat = {CAT!r}")
+                    upsert_meta(cur, target_post_id, '_cat', CAT)
+                if SUBCAT:
+                    print(f"  upsert_meta: _subcat = {SUBCAT!r}")
+                    upsert_meta(cur, target_post_id, '_subcat', SUBCAT)
 
-            # --- attach taxonomy ---
-            if CAT or SUBCAT:
-                cat_tt = ensure_category_term(cur, CAT) if CAT else None
-                sub_tt = ensure_category_term(cur, SUBCAT, parent_tt_id=cat_tt) if SUBCAT else None
-
+                # 可选： 同时 attach taxonomy（如果你需要前台分类生效）
+                # attach 到父商品（若是变体）
                 attach_to_id = target_post_id
                 if post_row.get('post_type') == 'product_variation' and post_row.get('post_parent'):
                     attach_to_id = post_row.get('post_parent')
 
-                if REPLACE_CATEGORIES:
-                    remove_product_cat_relationships(cur, attach_to_id)
+                print(f"  will attach taxonomy (if any) to object_id={attach_to_id}")
 
-                attach_term_to_post(cur, attach_to_id, sub_tt or cat_tt)
+                if CAT or SUBCAT:
+                    # get/create term_taxonomy ids
+                    cat_tt = ensure_category_term(cur, CAT) if CAT else None
+                    sub_tt = ensure_category_term(cur, SUBCAT, parent_tt_id=cat_tt) if SUBCAT else None
+                    print(f"  got cat_tt={cat_tt}, sub_tt={sub_tt}")
 
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"  [PH2 ERROR] post {WEBSITE_ID}: {e}")
-        finally:
-            conn.close()
+                    if REPLACE_CATEGORIES:
+                        print("  REPLACE_CATEGORIES True -> removing existing product_cat relations")
+                        remove_product_cat_relationships(cur, attach_to_id)
+
+                    to_attach = sub_tt or cat_tt
+                    if to_attach:
+                        attach_term_to_post(cur, attach_to_id, to_attach)
+                        print(f"  attached term_taxonomy_id={to_attach} to object_id={attach_to_id}")
+
+                conn.commit()
+
+                # verify: read back meta and taxonomy for the attach_to_id and target_post_id
+                cur.execute(
+                    "SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id=%s AND meta_key IN ('_cat','_subcat')",
+                    (target_post_id,))
+                metas = cur.fetchall()
+                print("  meta rows for target_post:", metas)
+
+                cur.execute("""
+                    SELECT t.name
+                    FROM wp_terms t
+                    JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id
+                    JOIN wp_term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                    WHERE tr.object_id=%s AND tt.taxonomy='product_cat'
+                """, (attach_to_id,))
+                cats = [r['name'] for r in cur.fetchall()]
+                print("  taxonomy attached to object:", cats)
+
+                print(f"  [PH2 OK] row #{idx} updated post {target_post_id}")
+
+            except Exception as e_inner:
+                conn.rollback()
+                print(f"  [PH2 ERROR] row #{idx} post {WEBSITE_ID}: {e_inner}")
+            finally:
+                try:
+                    cur.close()
+                except:
+                    pass
+                try:
+                    conn.close()
+                except:
+                    pass
+
+        except Exception as e_outer:
+            print(f"[PH2 OUTER ERROR] processing row #{idx}: {e_outer}")
 
 
 if __name__ == "__main__":
