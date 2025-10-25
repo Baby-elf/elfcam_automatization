@@ -140,9 +140,7 @@ def main():
     print("=== PHASE 1: meta & brand 更新（不处理 category） ===")
     for row in table[:32]:  # 测试时保留切片；生产可改为 table
         WEBSITE_ID = row[index_dict.get("website_id")]
-        if not WEBSITE_ID:
-            print("[SKIP] missing WEBSITE_ID, skip row")
-            continue
+
 
         ASIN = row[index_dict.get("asin")]
         EAN = row[index_dict.get("ean")]
@@ -150,7 +148,9 @@ def main():
         FNSKU = row[index_dict.get("fba_id")]
         WEIGHT = row[index_dict.get("weight")]
         BRAND = row[index_dict.get("brand")]
-
+        if not WEBSITE_ID:
+            print(f"[SKIP]{GOODS_CODE}: missing WEBSITE_ID, skip row")
+            continue
         NEW_VALUES = {
             'asin': ASIN, 'ean': EAN, 'goods_code': GOODS_CODE,
             'fnsku': FNSKU, 'weight': WEIGHT, 'brand': BRAND
@@ -162,7 +162,7 @@ def main():
             continue
 
         # 简短输出
-        print(f"[PH1] post_id={WEBSITE_ID} will_write_meta_keys={[k for k,v in NEW_VALUES.items() if v]} brand={(BRAND or '(none)')}")
+        print(f"[PH1] post_id={WEBSITE_ID} will_write_meta_keys={[k + ' ' + v for k,v in NEW_VALUES.items() if v]} brand={(BRAND or '(none)')}")
 
         if not APPLY:
             print("  [DRY-RUN] PH1 not applied.")
