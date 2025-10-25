@@ -243,19 +243,18 @@ def main():
             conn.close()
 
     # --- Phase 2: 独立分类写入循环（只用 WEBSITE_ID + category/sub_category） ---
-    print("\n=== PHASE 2: category / sub-category 写入（独立循环） ===")
+    print("\n=== PHASE 2: cat / subcat 写入到变体 ===")
     for row in table[:32]:
         WEBSITE_ID = row[index_dict.get("website_id")]
         if not WEBSITE_ID:
             print("[SKIP] missing WEBSITE_ID, skip row")
             continue
 
-        # 从 CSV 独立读取 category 字段（若没有则为空字符串）
-        CATEGORY = "category"
-        SUB_CATEGORY = "sub"
+        # 从 CSV 读取 cat 和 subcat 字段
+        CAT = row[index_dict.get("cat")] or ""
+        SUBCAT = row[index_dict.get("subcat")] or ""
 
-        # 若两者都为空则跳过
-        if not CATEGORY and not SUB_CATEGORY:
+        if not CAT and not SUBCAT:
             continue
 
         target_post_id, is_variation = parse_website_id(WEBSITE_ID)
@@ -263,8 +262,8 @@ def main():
             print(f"[ERROR] invalid WEBSITE_ID: {WEBSITE_ID}")
             continue
 
-        # 简短输出
-        print(f"[PH2] post_id={WEBSITE_ID} category={(CATEGORY or '(none)')} sub={(SUB_CATEGORY or '(none)')} replace={REPLACE_CATEGORIES}")
+        # 输出信息
+        print(f"[PH2] post_id={WEBSITE_ID} cat='{CAT}' subcat='{SUBCAT}'")
 
         if not APPLY:
             print("  [DRY-RUN] PH2 not applied.")
@@ -273,106 +272,29 @@ def main():
         conn = get_conn()
         try:
             with conn.cursor() as cur:
-                # check post exists
+                # 检查 post 是否存在
                 post_row = get_post_row(cur, target_post_id)
                 if not post_row:
                     print(f"  [ERROR] post {WEBSITE_ID} not found.")
                     continue
 
-                # 如果设置替换：先删除原有 product_cat 关系
-                # attach 到父商品（如果是变体）
-                attach_to_id = target_post_id
-                if post_row.get('post_type') == 'product_variation' and post_row.get('post_parent'):
-                    attach_to_id = post_row.get('post_parent')
+                # 如果是变体，只更新变体本身
+                if post_row.get('post_type') == 'product_variation':
+                    if CAT:
+                        upsert_meta(cur, target_post_id, '_cat', CAT)
+                    if SUBCAT:
+                        upsert_meta(cur, target_post_id, '_subcat', SUBCAT)
+                    print(f"  [PH2 OK] Updated variation {target_post_id} meta: _cat={CAT}, _subcat={SUBCAT}")
+                else:
+                    print(f"  [INFO] post {target_post_id} is not a variation, skip.")
 
-                # 如果设置替换：先删除原有 product_cat 关系
-                if REPLACE_CATEGORIES:
-                    remove_product_cat_relationships(cur, attach_to_id)
-
-                # 创建 / 获取 category / sub-category term_taxonomy_id（带 debug）
-                cat_tt = None
-                cat_term_id = None
-                if CATEGORY:
-                    # 先查或创建 term（并取 term_id）
-                    cur.execute("SELECT term_id FROM wp_terms WHERE name=%s LIMIT 1", (CATEGORY,))
-                    rowt = cur.fetchone()
-                    if rowt:
-                        cat_term_id = rowt['term_id']
-                        print(f"  [DEBUG] found CATEGORY term_id={cat_term_id} for '{CATEGORY}'")
-                    else:
-                        slug = CATEGORY.lower().replace(' ', '-')
-                        cur.execute("INSERT INTO wp_terms (name, slug) VALUES (%s, %s)", (CATEGORY, slug))
-                        cat_term_id = cur.lastrowid
-                        print(f"  [DEBUG] created CATEGORY term_id={cat_term_id} for '{CATEGORY}'")
-
-                    # 查或创建 term_taxonomy（product_cat）
-                    cur.execute(
-                        "SELECT term_taxonomy_id, parent FROM wp_term_taxonomy WHERE term_id=%s AND taxonomy='product_cat' LIMIT 1",
-                        (cat_term_id,))
-                    rtt = cur.fetchone()
-                    if rtt:
-                        cat_tt = rtt['term_taxonomy_id']
-                        print(f"  [DEBUG] found CATEGORY term_taxonomy_id={cat_tt} parent={rtt.get('parent')}")
-                    else:
-                        cur.execute(
-                            "INSERT INTO wp_term_taxonomy (term_id, taxonomy, description, parent, count) VALUES (%s,'product_cat','',0,0)",
-                            (cat_term_id,))
-                        cat_tt = cur.lastrowid
-                        print(f"  [DEBUG] created CATEGORY term_taxonomy_id={cat_tt}")
-
-                if SUB_CATEGORY:
-                    # 同样处理子分类，并把 parent 写为 cat_term_id（term_id）
-                    cur.execute("SELECT term_id FROM wp_terms WHERE name=%s LIMIT 1", (SUB_CATEGORY,))
-                    rowt = cur.fetchone()
-                    if rowt:
-                        sub_term_id = rowt['term_id']
-                        print(f"  [DEBUG] found SUB_CATEGORY term_id={sub_term_id} for '{SUB_CATEGORY}'")
-                    else:
-                        slug = SUB_CATEGORY.lower().replace(' ', '-')
-                        cur.execute("INSERT INTO wp_terms (name, slug) VALUES (%s, %s)", (SUB_CATEGORY, slug))
-                        sub_term_id = cur.lastrowid
-                        print(f"  [DEBUG] created SUB_CATEGORY term_id={sub_term_id} for '{SUB_CATEGORY}'")
-
-                    cur.execute(
-                        "SELECT term_taxonomy_id, parent FROM wp_term_taxonomy WHERE term_id=%s AND taxonomy='product_cat' LIMIT 1",
-                        (sub_term_id,))
-                    rtt = cur.fetchone()
-                    if rtt:
-                        sub_tt = rtt['term_taxonomy_id']
-                        print(f"  [DEBUG] found SUB_CATEGORY term_taxonomy_id={sub_tt} parent={rtt.get('parent')}")
-                    else:
-                        # 注意这里 parent 我们传 cat_term_id（term_id）
-                        cur.execute(
-                            "INSERT INTO wp_term_taxonomy (term_id, taxonomy, description, parent, count) VALUES (%s,'product_cat','',%s,0)",
-                            (sub_term_id, cat_term_id or 0))
-                        sub_tt = cur.lastrowid
-                        print(f"  [DEBUG] created SUB_CATEGORY term_taxonomy_id={sub_tt} parent_term_id={cat_term_id}")
-
-                    print(f"  [DEBUG] about to attach sub_tt={sub_tt} to post_id={target_post_id}")
-                    attach_term_to_post(cur, attach_to_id, sub_tt)
-                elif cat_tt:
-                    print(f"  [DEBUG] about to attach cat_tt={cat_tt} to post_id={target_post_id}")
-                    attach_term_to_post(cur, attach_to_id, cat_tt)
-
-                conn.commit()
-
-                # 简短输出已写入的分类（读取 DB）
-                cur.execute("""
-                    SELECT t.name
-                    FROM wp_terms t
-                    JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id
-                    JOIN wp_term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
-                    WHERE tr.object_id=%s AND tt.taxonomy='product_cat'
-                """, (attach_to_id,))
-
-                cats = [r['name'] for r in cur.fetchall()]
-                print(f"  [PH2 OK] categories: {cats}")
-
+            conn.commit()
         except Exception as e:
             conn.rollback()
             print(f"  [PH2 ERROR] post {WEBSITE_ID}: {e}")
         finally:
             conn.close()
+
 
 if __name__ == "__main__":
     main()
