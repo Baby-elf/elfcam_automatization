@@ -198,26 +198,6 @@ def main():
                     attach_to_id = post_row.get('post_parent')
                 print(f"[INFO] taxonomy attach target: {attach_to_id}, meta target: {target_post_id}")
 
-                cat_tt_id = None
-                sub_cat_tt_id = None
-
-                # # 创建分类 term_taxonomy_id
-                # if CATEGORY:
-                #     cat_tt_id = ensure_category_term(cur, CATEGORY)
-                # if SUB_CATEGORY:
-                #     sub_cat_tt_id = ensure_category_term(cur, SUB_CATEGORY, parent_tt_id=cat_tt_id)
-                #
-                # # attach taxonomy 到父商品
-                # if sub_cat_tt_id:
-                #     attach_term_to_post(cur, attach_to_id, sub_cat_tt_id)
-                # elif cat_tt_id:
-                #     attach_term_to_post(cur, attach_to_id, cat_tt_id)
-                #
-                # # 写入 meta 到 target_post_id（兼容 PHP 插件显示）
-                # if CATEGORY:
-                #     upsert_meta(cur, target_post_id, '_category', CATEGORY)
-                # if SUB_CATEGORY:
-                #     upsert_meta(cur, target_post_id, '_sub_category', SUB_CATEGORY)
 
                 # 查询打印结果
                 cur.execute("""
@@ -243,16 +223,24 @@ def main():
             conn.close()
 
     # --- Phase 2: 独立分类写入循环（只用 WEBSITE_ID + category/sub_category） ---
+    website_price = read_csv_by_sheet("Website-Price", "Elfcam")
+    index_dict = {r:i for i, r in enumerate(website_price[0])}
+    rows = website_price[1:]
+    orders = read_csv_by_sheet("Website-Price", "order")
+    index_dict_order = {r:i for i, r in enumerate(orders[0])}
+    order_dict = {r[index_dict_order["catalog_ss_item"]]: r[index_dict_order["catalog_ss_subgroup"]] + "-" + r[index_dict_order["catalog_ss_group"]] for r in orders[1:]}
     print("\n=== PHASE 2: cat / subcat 写入到变体 ===")
-    for row in table[:32]:
-        WEBSITE_ID = row[index_dict.get("website_id")]
+    for row in rows[:32]:
+
+        WEBSITE_ID = row[index_dict.get("id")]
+        SUBCAT =  row[index_dict.get("category")]
+        CAT = order_dict.get(SUBCAT)
+
+
         if not WEBSITE_ID:
             print("[SKIP] missing WEBSITE_ID, skip row")
             continue
 
-        # 从 CSV 读取 cat 和 subcat 字段
-        CAT = "cat"
-        SUBCAT = "subcat"
 
         if not CAT and not SUBCAT:
             continue
@@ -287,6 +275,20 @@ def main():
                     print(f"  [PH2 OK] Updated variation {target_post_id} meta: _cat={CAT}, _subcat={SUBCAT}")
                 else:
                     print(f"  [INFO] post {target_post_id} is not a variation, skip.")
+
+            # --- attach taxonomy ---
+            if CAT or SUBCAT:
+                cat_tt = ensure_category_term(cur, CAT) if CAT else None
+                sub_tt = ensure_category_term(cur, SUBCAT, parent_tt_id=cat_tt) if SUBCAT else None
+
+                attach_to_id = target_post_id
+                if post_row.get('post_type') == 'product_variation' and post_row.get('post_parent'):
+                    attach_to_id = post_row.get('post_parent')
+
+                if REPLACE_CATEGORIES:
+                    remove_product_cat_relationships(cur, attach_to_id)
+
+                attach_term_to_post(cur, attach_to_id, sub_tt or cat_tt)
 
             conn.commit()
         except Exception as e:
