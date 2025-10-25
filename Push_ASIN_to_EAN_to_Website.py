@@ -138,7 +138,7 @@ def main():
 
     # --- Phase 1: meta & brand (不处理分类) ---
     print("=== PHASE 1: meta & brand 更新（不处理 category） ===")
-    for row in table[:32]:  # 测试时保留切片；生产可改为 table
+    for row in table:  # 测试时保留切片；生产可改为 table
         WEBSITE_ID = row[index_dict.get("website_id")]
 
 
@@ -245,7 +245,7 @@ def main():
         print("DEBUG: index_dict has id and category indices:", index_dict["id"], index_dict["category"])
 
     # loop
-    for idx, row in enumerate(rows[:32], 1):
+    for idx, row in enumerate(rows, 1):
         try:
             WEBSITE_ID = row[index_dict.get("id")]
             SUBCAT = row[index_dict.get("category")]
