@@ -201,23 +201,23 @@ def main():
                 cat_tt_id = None
                 sub_cat_tt_id = None
 
-                # 创建分类 term_taxonomy_id
-                if CATEGORY:
-                    cat_tt_id = ensure_category_term(cur, CATEGORY)
-                if SUB_CATEGORY:
-                    sub_cat_tt_id = ensure_category_term(cur, SUB_CATEGORY, parent_tt_id=cat_tt_id)
-
-                # attach taxonomy 到父商品
-                if sub_cat_tt_id:
-                    attach_term_to_post(cur, attach_to_id, sub_cat_tt_id)
-                elif cat_tt_id:
-                    attach_term_to_post(cur, attach_to_id, cat_tt_id)
-
-                # 写入 meta 到 target_post_id（兼容 PHP 插件显示）
-                if CATEGORY:
-                    upsert_meta(cur, target_post_id, '_category', CATEGORY)
-                if SUB_CATEGORY:
-                    upsert_meta(cur, target_post_id, '_sub_category', SUB_CATEGORY)
+                # # 创建分类 term_taxonomy_id
+                # if CATEGORY:
+                #     cat_tt_id = ensure_category_term(cur, CATEGORY)
+                # if SUB_CATEGORY:
+                #     sub_cat_tt_id = ensure_category_term(cur, SUB_CATEGORY, parent_tt_id=cat_tt_id)
+                #
+                # # attach taxonomy 到父商品
+                # if sub_cat_tt_id:
+                #     attach_term_to_post(cur, attach_to_id, sub_cat_tt_id)
+                # elif cat_tt_id:
+                #     attach_term_to_post(cur, attach_to_id, cat_tt_id)
+                #
+                # # 写入 meta 到 target_post_id（兼容 PHP 插件显示）
+                # if CATEGORY:
+                #     upsert_meta(cur, target_post_id, '_category', CATEGORY)
+                # if SUB_CATEGORY:
+                #     upsert_meta(cur, target_post_id, '_sub_category', SUB_CATEGORY)
 
                 # 查询打印结果
                 cur.execute("""
@@ -251,8 +251,8 @@ def main():
             continue
 
         # 从 CSV 读取 cat 和 subcat 字段
-        CAT = row[index_dict.get("cat")] or ""
-        SUBCAT = row[index_dict.get("subcat")] or ""
+        CAT = "cat"
+        SUBCAT = "subcat"
 
         if not CAT and not SUBCAT:
             continue
