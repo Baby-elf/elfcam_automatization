@@ -188,6 +188,51 @@ def main():
                 if brand_name:
                     tt = ensure_brand_term(cur, brand_name)
                     attach_brand_to_post(cur, target_post_id, tt)
+                # --------------------------
+                # 写入分类 / 子分类
+                # --------------------------
+
+                # 决定 taxonomy attach 对象：父商品（parent）还是自己
+                attach_to_id = target_post_id
+                if post_row.get('post_type') == 'product_variation' and post_row.get('post_parent'):
+                    attach_to_id = post_row.get('post_parent')
+                print(f"[INFO] taxonomy attach target: {attach_to_id}, meta target: {target_post_id}")
+
+                cat_tt_id = None
+                sub_cat_tt_id = None
+
+                # 创建分类 term_taxonomy_id
+                if CATEGORY:
+                    cat_tt_id = ensure_category_term(cur, CATEGORY)
+                if SUB_CATEGORY:
+                    sub_cat_tt_id = ensure_category_term(cur, SUB_CATEGORY, parent_tt_id=cat_tt_id)
+
+                # attach taxonomy 到父商品
+                if sub_cat_tt_id:
+                    attach_term_to_post(cur, attach_to_id, sub_cat_tt_id)
+                elif cat_tt_id:
+                    attach_term_to_post(cur, attach_to_id, cat_tt_id)
+
+                # 写入 meta 到 target_post_id（兼容 PHP 插件显示）
+                if CATEGORY:
+                    upsert_meta(cur, target_post_id, '_category', CATEGORY)
+                if SUB_CATEGORY:
+                    upsert_meta(cur, target_post_id, '_sub_category', SUB_CATEGORY)
+
+                # 查询打印结果
+                cur.execute("""
+                    SELECT t.name
+                    FROM wp_terms t
+                    JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id
+                    JOIN wp_term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                    WHERE tr.object_id=%s AND tt.taxonomy='product_cat'
+                """, (attach_to_id,))
+                cats = [r['name'] for r in cur.fetchall()]
+                print(f"[OK] taxonomy categories (attached to {attach_to_id}): {cats}")
+
+                meta_cat = fetch_meta(cur, target_post_id).get('_category')
+                meta_sub = fetch_meta(cur, target_post_id).get('_sub_category')
+                print(f"[OK] meta _category={meta_cat}, _sub_category={meta_sub}")
 
                 conn.commit()
                 print(f"  [PH1 OK] updated post {WEBSITE_ID}")
@@ -235,8 +280,14 @@ def main():
                     continue
 
                 # 如果设置替换：先删除原有 product_cat 关系
+                # attach 到父商品（如果是变体）
+                attach_to_id = target_post_id
+                if post_row.get('post_type') == 'product_variation' and post_row.get('post_parent'):
+                    attach_to_id = post_row.get('post_parent')
+
+                # 如果设置替换：先删除原有 product_cat 关系
                 if REPLACE_CATEGORIES:
-                    remove_product_cat_relationships(cur, target_post_id)
+                    remove_product_cat_relationships(cur, attach_to_id)
 
                 # 创建 / 获取 category / sub-category term_taxonomy_id（带 debug）
                 cat_tt = None
@@ -298,10 +349,10 @@ def main():
                         print(f"  [DEBUG] created SUB_CATEGORY term_taxonomy_id={sub_tt} parent_term_id={cat_term_id}")
 
                     print(f"  [DEBUG] about to attach sub_tt={sub_tt} to post_id={target_post_id}")
-                    attach_term_to_post(cur, target_post_id, sub_tt)
+                    attach_term_to_post(cur, attach_to_id, sub_tt)
                 elif cat_tt:
                     print(f"  [DEBUG] about to attach cat_tt={cat_tt} to post_id={target_post_id}")
-                    attach_term_to_post(cur, target_post_id, cat_tt)
+                    attach_term_to_post(cur, attach_to_id, cat_tt)
 
                 conn.commit()
 
@@ -312,7 +363,8 @@ def main():
                     JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id
                     JOIN wp_term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
                     WHERE tr.object_id=%s AND tt.taxonomy='product_cat'
-                """, (target_post_id,))
+                """, (attach_to_id,))
+
                 cats = [r['name'] for r in cur.fetchall()]
                 print(f"  [PH2 OK] categories: {cats}")
 
