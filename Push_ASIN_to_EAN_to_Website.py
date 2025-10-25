@@ -23,7 +23,7 @@ DB_NAME = 'elfcams_db'
 DB_CHARSET = 'utf8mb4'
 
 # 控制开关
-APPLY = False              # False = dry-run；True = 写入
+APPLY = True              # False = dry-run；True = 写入
 REPLACE_CATEGORIES = False # 在分类写入时是否先删除原有 product_cat 关系（替换）
 
 # ----------------------------
