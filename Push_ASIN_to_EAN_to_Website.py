@@ -162,7 +162,7 @@ def main():
             continue
 
         # 简短输出
-        print(f"[PH1] post_id={target_post_id} will_write_meta_keys={[k for k,v in NEW_VALUES.items() if v]} brand={(BRAND or '(none)')}")
+        print(f"[PH1] post_id={WEBSITE_ID} will_write_meta_keys={[k for k,v in NEW_VALUES.items() if v]} brand={(BRAND or '(none)')}")
 
         if not APPLY:
             print("  [DRY-RUN] PH1 not applied.")
@@ -174,7 +174,7 @@ def main():
                 # check post exists
                 post_row = get_post_row(cur, target_post_id)
                 if not post_row:
-                    print(f"  [ERROR] post {target_post_id} not found.")
+                    print(f"  [ERROR] post {WEBSITE_ID} not found.")
                     continue
 
                 # upsert meta
@@ -190,10 +190,10 @@ def main():
                     attach_brand_to_post(cur, target_post_id, tt)
 
                 conn.commit()
-                print(f"  [PH1 OK] updated post {target_post_id}")
+                print(f"  [PH1 OK] updated post {WEBSITE_ID}")
         except Exception as e:
             conn.rollback()
-            print(f"  [PH1 ERROR] post {target_post_id}: {e}")
+            print(f"  [PH1 ERROR] post {WEBSITE_ID}: {e}")
         finally:
             conn.close()
 
@@ -219,7 +219,7 @@ def main():
             continue
 
         # 简短输出
-        print(f"[PH2] post_id={target_post_id} category={(CATEGORY or '(none)')} sub={(SUB_CATEGORY or '(none)')} replace={REPLACE_CATEGORIES}")
+        print(f"[PH2] post_id={WEBSITE_ID} category={(CATEGORY or '(none)')} sub={(SUB_CATEGORY or '(none)')} replace={REPLACE_CATEGORIES}")
 
         if not APPLY:
             print("  [DRY-RUN] PH2 not applied.")
@@ -231,7 +231,7 @@ def main():
                 # check post exists
                 post_row = get_post_row(cur, target_post_id)
                 if not post_row:
-                    print(f"  [ERROR] post {target_post_id} not found.")
+                    print(f"  [ERROR] post {WEBSITE_ID} not found.")
                     continue
 
                 # 如果设置替换：先删除原有 product_cat 关系
@@ -263,7 +263,7 @@ def main():
 
         except Exception as e:
             conn.rollback()
-            print(f"  [PH2 ERROR] post {target_post_id}: {e}")
+            print(f"  [PH2 ERROR] post {WEBSITE_ID}: {e}")
         finally:
             conn.close()
 
