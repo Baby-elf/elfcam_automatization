@@ -108,6 +108,46 @@ def attach_brand_to_post(cursor, post_id, tt_id):
     if not cursor.fetchone():
         cursor.execute("INSERT INTO wp_term_relationships (object_id, term_taxonomy_id) VALUES (%s, %s)", (post_id, tt_id))
 
+
+def ensure_category_term(cursor, cat_name, taxonomy='product_cat', parent_tt_id=None):
+    """
+    确保分类 term 存在，返回 term_taxonomy_id
+    - parent_tt_id: 如果有父级分类（sub-category），则指定 parent
+    """
+    cat_name = cat_name.strip()
+    if not cat_name:
+        return None
+    cursor.execute("SELECT term_id FROM wp_terms WHERE name=%s LIMIT 1", (cat_name,))
+    r = cursor.fetchone()
+    if r:
+        term_id = r['term_id']
+    else:
+        slug = cat_name.lower().replace(' ', '-')
+        cursor.execute("INSERT INTO wp_terms (name, slug) VALUES (%s, %s)", (cat_name, slug))
+        term_id = cursor.lastrowid
+
+    cursor.execute("SELECT term_taxonomy_id FROM wp_term_taxonomy WHERE term_id=%s AND taxonomy=%s LIMIT 1",
+                   (term_id, taxonomy))
+    r2 = cursor.fetchone()
+    if r2:
+        tt_id = r2['term_taxonomy_id']
+    else:
+        parent = parent_tt_id if parent_tt_id else 0
+        cursor.execute("INSERT INTO wp_term_taxonomy (term_id, taxonomy, description, parent, count) VALUES (%s,%s,'',%s,0)",
+                       (term_id, taxonomy, parent))
+        tt_id = cursor.lastrowid
+    return tt_id
+
+def attach_term_to_post(cursor, post_id, tt_id):
+    if not tt_id:
+        return
+    cursor.execute("SELECT 1 FROM wp_term_relationships WHERE object_id=%s AND term_taxonomy_id=%s LIMIT 1",
+                   (post_id, tt_id))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO wp_term_relationships (object_id, term_taxonomy_id) VALUES (%s,%s)",
+                       (post_id, tt_id))
+
+
 def main():
     from utils.utils import read_csv_by_sheet
     asin_to_ean = read_csv_by_sheet("ELFCAM-Database", "Asin_to_EAN")
@@ -115,7 +155,7 @@ def main():
     asin_to_ean_table = asin_to_ean[1:]
     index_dict = {r:i for i,r in enumerate(index)}
 
-    for row in asin_to_ean_table:
+    for row in asin_to_ean_table[:32]:
         WEBSITE_ID = row[index_dict.get("website_id")]
         ASIN = row[index_dict.get("asin")]
         EAN = row[index_dict.get("ean")]
@@ -123,6 +163,7 @@ def main():
         FNSKU = row[index_dict.get("fba_id")]
         WEIGHT = row[index_dict.get("weight")]
         BRAND = row[index_dict.get("brand")]
+
         NEW_VALUES = {
             'asin': ASIN,
             'ean': EAN,
@@ -131,6 +172,9 @@ def main():
             'weight': WEIGHT,  # 或你实际的重量
             'brand': BRAND  # 如果你想写 brand
         }
+
+        CATEGORY = "category"
+        SUB_CATEGORY = "sub-category"
 
         if not WEBSITE_ID:
             print(f"{GOODS_CODE} : 无Website id， 继续")
@@ -195,20 +239,43 @@ def main():
                 # APPLY = True -> 写入
                 print("\nAPPLY=True，开始事务写入...")
                 try:
+                    # 写入 meta
                     for mk, mv in to_write.items():
                         upsert_meta(cur, target_post_id, mk, mv)
+
+                    # 写入 brand（如果有）
+                    tt_id = None
                     if brand_name:
                         tt_id = ensure_brand_term(cur, brand_name)
                         attach_brand_to_post(cur, target_post_id, tt_id)
+
+                    # --------------- 在这里插入分类写入逻辑 ---------------
+                    # CATEGORY 和 SUB_CATEGORY 在 main() 开头应已读取：
+                    # CATEGORY = row[index_dict.get("category", '')]
+                    # SUB_CATEGORY = row[index_dict.get("sub_category", '')]
+
+                    cat_tt_id = None
+                    if CATEGORY:
+                        cat_tt_id = ensure_category_term(cur, CATEGORY)  # 会创建 term 和 term_taxonomy
+                    if SUB_CATEGORY:
+                        # 如果有子分类，将其 parent 设为 cat_tt_id（如果 cat_tt_id 为 None，则 parent=0）
+                        sub_cat_tt_id = ensure_category_term(cur, SUB_CATEGORY, parent_tt_id=cat_tt_id)
+                        attach_term_to_post(cur, target_post_id, sub_cat_tt_id)
+                    elif cat_tt_id:
+                        attach_term_to_post(cur, target_post_id, cat_tt_id)
+                    # --------------- 分类写入结束 ----------------------------
+
+                    # 提交事务
                     conn.commit()
-                    # 写入完成后查询实际写入结果
+
+                    # 写入完成后查询实际写入结果：meta
                     print("\n写入后的实际 meta:")
                     metas = fetch_meta(cur, target_post_id)
                     for mk, mv in metas.items():
                         print(f"  {mk} = {mv}")
 
-                    if brand_name:
-                        tt_id = ensure_brand_term(cur, brand_name)
+                    # 查询并打印写入后的品牌（如果有）
+                    if brand_name and tt_id:
                         cur.execute("""
                             SELECT t.name
                             FROM wp_terms t
@@ -219,9 +286,21 @@ def main():
                         brands = [r['name'] for r in cur.fetchall()]
                         print("写入后的品牌:", brands)
 
+                    # 查询并打印写入后的分类（product_cat）
+                    cur.execute("""
+                        SELECT t.name
+                        FROM wp_terms t
+                        JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id
+                        JOIN wp_term_relationships tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                        WHERE tr.object_id=%s AND tt.taxonomy='product_cat'
+                    """, (target_post_id,))
+                    cats = [r['name'] for r in cur.fetchall()]
+                    print("写入后的分类:", cats)
+
                 except Exception as e:
                     conn.rollback()
                     print("写入时发生异常，已回滚。错误：", e)
+
         except Exception as e:
             print("发生错误：", e)
         finally:
