@@ -1,7 +1,7 @@
 cat > /root/elfcam_automatization/run_push_asin_to_ean_to_website.sh <<'EOF'
 #!/bin/bash
 # 每天一个日志文件
-LOG="/var/log/run_push_asin_to_ean_to_website_$(date +%F).log"
+LOG="/var/log/elfcam/run_push_asin_to_ean_to_website_$(date +%F).log"
 exec >> "$LOG" 2>&1
 
 echo "[$(date '+%F %T')] run_push_asin_to_ean_to_website.sh started"
