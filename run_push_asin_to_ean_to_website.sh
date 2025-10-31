@@ -20,9 +20,9 @@ echo "[INFO] Using python interpreter: $PY"
 # 清理 __pycache__ （可选）
 find /root/elfcam_automatization -name '__pycache__' -type d -prune -exec rm -rf {} +
 
-echo "===== $(date '+%F %T') 开始执行 update_single_item_two_phase.py ====="
-"$PY" /root/elfcam_automatization/update_single_item_two_phase.py
-echo "===== $(date '+%F %T') update_single_item_two_phase.py 执行结束 ====="
+echo "===== $(date '+%F %T') 开始执行 Push_ASIN_to_EAN_to_Website.py ====="
+"$PY" /root/elfcam_automatization/Push_ASIN_to_EAN_to_Website.py
+echo "===== $(date '+%F %T') Push_ASIN_to_EAN_to_Website.py 执行结束 ====="
 
 echo "[$(date '+%F %T')] run_push_asin_to_ean_to_website.sh finished"
 EOF
