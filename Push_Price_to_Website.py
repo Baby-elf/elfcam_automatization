@@ -292,8 +292,9 @@ def main():
         except Exception as e_outer:
             logging.error("Row %d: outer error processing row: %s", idx, e_outer)
 
+
     if update:
-        write_and_upload_csv(rows,"rows.csv", "Website-Price", "Elfcam", header)
+        write_and_upload_csv(rows,"csv/csv.csv", "Website-Price", "Elfcam2", header)
 
 if __name__ == "__main__":
     main()
