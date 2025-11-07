@@ -240,7 +240,7 @@ def main():
                     conn.commit()
                     logging.info(info, idx)
                     update = True
-                    rows[idx][index_dict[change_key]] = info
+                    rows[idx-1][index_dict[change_key]] = info
                     # verify: 读回 meta 值并打印
                     cur.execute("""
                         SELECT meta_key, meta_value FROM wp_postmeta
