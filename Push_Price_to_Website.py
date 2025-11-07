@@ -235,7 +235,7 @@ def main():
                     upsert_meta(cur, write_post_id, "_sale_price", sale_price)
                     upsert_meta(cur, write_post_id, "_price", price_to_set)
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    info = str(idx) + ": [OK] committed in " + now_str
+                    info = "Row " + str(idx) + ": [OK] committed in " + now_str
                     # commit
                     conn.commit()
                     logging.info(info, idx)
@@ -294,7 +294,7 @@ def main():
 
 
     if update:
-        write_and_upload_csv(rows,"csv/csv.csv", "Website-Price", "Elfcam2", header)
+        write_and_upload_csv(rows,"csv/csv.csv", "Website-Price", "Elfcam", header)
 
 if __name__ == "__main__":
     main()
