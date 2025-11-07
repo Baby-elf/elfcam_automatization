@@ -235,7 +235,7 @@ def main():
                     upsert_meta(cur, write_post_id, "_sale_price", sale_price)
                     upsert_meta(cur, write_post_id, "_price", price_to_set)
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    info = post_row + ": [OK] committed in " + now_str
+                    info = str(idx) + ": [OK] committed in " + now_str
                     # commit
                     conn.commit()
                     logging.info(info, idx)
