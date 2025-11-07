@@ -17,6 +17,7 @@ update_prices_only_full.py
 import logging
 import pymysql
 from decimal import Decimal, InvalidOperation
+from datetime import datetime
 
 # ----------------------------
 # 配置区（按需修改）
@@ -116,7 +117,7 @@ def read_db_string_as_decimal(s):
 # 主流程
 # ----------------------------
 def main():
-    from utils.utils import read_csv_by_sheet
+    from utils.utils import read_csv_by_sheet, write_and_upload_csv
 
     website_price = read_csv_by_sheet("Website-Price", "Elfcam")
     if not website_price or len(website_price) < 1:
@@ -127,7 +128,6 @@ def main():
     rows = website_price[1:]
     index_dict = {r:i for i, r in enumerate(header)}
 
-    logging.info("DEBUG header: %s", header)
 
     # 必需的列检查
     if "id" not in index_dict:
@@ -148,7 +148,9 @@ def main():
         logging.info("Using Change_Price column header: %s", change_key)
 
     logging.info("START processing %d rows", len(rows))
+    update = False
     for idx, row in enumerate(rows, 1):
+
         try:
             WEBSITE_ID = row[index_dict.get("id")]
             def get_col(col_name):
@@ -232,11 +234,13 @@ def main():
                     upsert_meta(cur, write_post_id, "_regular_price", regular_price)
                     upsert_meta(cur, write_post_id, "_sale_price", sale_price)
                     upsert_meta(cur, write_post_id, "_price", price_to_set)
-
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    info = "Row %d: [OK] committed in " + now_str
                     # commit
                     conn.commit()
-                    logging.info("Row %d: [OK] committed", idx)
-
+                    logging.info(info, idx)
+                    update = True
+                    rows[idx][index_dict[change_key]] = info
                     # verify: 读回 meta 值并打印
                     cur.execute("""
                         SELECT meta_key, meta_value FROM wp_postmeta
@@ -245,33 +249,33 @@ def main():
                     rows_back = cur.fetchall()
                     logging.info("Row %d: [VERIFY] written metas: %s", idx, rows_back)
 
-                    # 可选：同步 parent 的 _price（设为子变体中最小 price）
-                    if SYNC_PARENT_PRICE and is_variation and post_row.get('post_parent'):
-                        parent_id = post_row.get('post_parent')
-                        try:
-                            # 读取所有子变体的 _price
-                            cur.execute("""
-                                SELECT pm.meta_value AS price_val
-                                FROM wp_posts p
-                                JOIN wp_postmeta pm ON p.ID = pm.post_id AND pm.meta_key = '_price'
-                                WHERE p.post_parent=%s AND p.post_type='product_variation'
-                            """, (parent_id,))
-                            price_vals = [r['price_val'] for r in cur.fetchall()]
-                            decimal_prices = [read_db_string_as_decimal(v) for v in price_vals]
-                            decimal_prices = [p for p in decimal_prices if p is not None]
-                            if decimal_prices:
-                                min_price = str(min(decimal_prices))
-                                logging.info("Row %d: SYNC_PARENT_PRICE: setting parent_id=%s _price = %s", idx, parent_id, min_price)
-                                upsert_meta(cur, parent_id, "_price", min_price)
-                                conn.commit()
-                                # verify parent meta
-                                cur.execute("SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id=%s AND meta_key='_price'", (parent_id,))
-                                logging.info("Row %d: [VERIFY parent] %s", idx, cur.fetchall())
-                            else:
-                                logging.info("Row %d: SYNC_PARENT_PRICE: no valid child _price values found for parent, skipping parent sync.", idx)
-                        except Exception as e_sync:
-                            conn.rollback()
-                            logging.error("Row %d: ERROR while syncing parent price: %s", idx, e_sync)
+                    # # 可选：同步 parent 的 _price（设为子变体中最小 price）
+                    # if SYNC_PARENT_PRICE and is_variation and post_row.get('post_parent'):
+                    #     parent_id = post_row.get('post_parent')
+                    #     try:
+                    #         # 读取所有子变体的 _price
+                    #         cur.execute("""
+                    #             SELECT pm.meta_value AS price_val
+                    #             FROM wp_posts p
+                    #             JOIN wp_postmeta pm ON p.ID = pm.post_id AND pm.meta_key = '_price'
+                    #             WHERE p.post_parent=%s AND p.post_type='product_variation'
+                    #         """, (parent_id,))
+                    #         price_vals = [r['price_val'] for r in cur.fetchall()]
+                    #         decimal_prices = [read_db_string_as_decimal(v) for v in price_vals]
+                    #         decimal_prices = [p for p in decimal_prices if p is not None]
+                    #         if decimal_prices:
+                    #             min_price = str(min(decimal_prices))
+                    #             logging.info("Row %d: SYNC_PARENT_PRICE: setting parent_id=%s _price = %s", idx, parent_id, min_price)
+                    #             upsert_meta(cur, parent_id, "_price", min_price)
+                    #             conn.commit()
+                    #             # verify parent meta
+                    #             cur.execute("SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id=%s AND meta_key='_price'", (parent_id,))
+                    #             logging.info("Row %d: [VERIFY parent] %s", idx, cur.fetchall())
+                    #         else:
+                    #             logging.info("Row %d: SYNC_PARENT_PRICE: no valid child _price values found for parent, skipping parent sync.", idx)
+                    #     except Exception as e_sync:
+                    #         conn.rollback()
+                    #         logging.error("Row %d: ERROR while syncing parent price: %s", idx, e_sync)
 
             except Exception as e_inner:
                 try:
@@ -287,6 +291,9 @@ def main():
 
         except Exception as e_outer:
             logging.error("Row %d: outer error processing row: %s", idx, e_outer)
+
+    if update:
+        write_and_upload_csv(rows,"rows.csv", "Website-Price", "Elfcam", header)
 
 if __name__ == "__main__":
     main()
