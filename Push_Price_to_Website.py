@@ -91,7 +91,7 @@ def normalize_price_for_db(v):
     s = str(v).strip()
     if s == "":
         return ""
-    s2 = s.replace(',', '')
+    s2 = s.replace(',', '.')
     try:
         # 验证是数字
         Decimal(s2)
