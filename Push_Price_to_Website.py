@@ -117,7 +117,8 @@ def read_db_string_as_decimal(s):
 # 主流程
 # ----------------------------
 def main():
-    from utils.utils import read_csv_by_sheet, write_and_upload_csv
+    from utils.utils import read_csv_by_sheet
+    from utils.uploader import update_google_sheet_cell
 
     website_price = read_csv_by_sheet("Website-Price", "Elfcam")
     if not website_price or len(website_price) < 1:
@@ -239,9 +240,9 @@ def main():
                     # commit
                     conn.commit()
                     #logging.info(info, idx)
-                    update = True
-                    rows[idx-1][index_dict[change_key]] = info
 
+                    #rows[idx-1][index_dict[change_key]] = info
+                    update_google_sheet_cell("Website-Price", "Elfcam", int(idx-1), int(index_dict[change_key]), info)
                     # verify: 读回 meta 值并打印
                     cur.execute("""
                         SELECT meta_key, meta_value FROM wp_postmeta
@@ -249,6 +250,7 @@ def main():
                     """, (write_post_id,))
                     rows_back = cur.fetchall()
                     logging.info("Row %d: [VERIFY] written metas: %s", idx, rows_back)
+
 
                     # # 可选：同步 parent 的 _price（设为子变体中最小 price）
                     # if SYNC_PARENT_PRICE and is_variation and post_row.get('post_parent'):
@@ -294,13 +296,13 @@ def main():
             logging.error("Row %d: outer error processing row: %s", idx, e_outer)
 
 
-    if update:
-        new_rows = []
-        for row in rows:
-
-            row[index_dict.get("image")] = "=IMAGE(" + '"' +row[index_dict.get("main_image")] + '"' + ")"
-            new_rows.append(row)
-        write_and_upload_csv(new_rows,"csv/csv.csv", "Website-Price", "Elfcam", header)
+    # if update:
+    #     new_rows = []
+    #     for row in rows:
+    #
+    #         row[index_dict.get("image")] = "=IMAGE(" + '"' +row[index_dict.get("main_image")] + '"' + ")"
+    #         new_rows.append(row)
+    #     write_and_upload_csv(new_rows,"csv/csv.csv", "Website-Price", "Elfcam", header)
 
 if __name__ == "__main__":
     main()

@@ -46,3 +46,5 @@ def write_and_upload_csv(data_list, csv_file, table, sheet_name, firstline=None,
                 logging.error(f"Max retry attempts reached. Failed to upload to {table} - {sheet_name}. Error: {e}")
 
 
+
+

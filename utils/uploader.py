@@ -160,6 +160,27 @@ def delete_sheet_by_name(table, sheet_name):
     except gspread.exceptions.WorksheetNotFound:
         logging.error(f"There is no sheet named {sheet_name}.")
 
+
+def update_google_sheet_cell(spreadsheet_name, sheet_name, row, col, value):
+    """
+    更新 Google Sheets 某一个单元格内容（基于行列数字定位）
+
+    :param spreadsheet_name: 你的 Sheet 文件名称 (string)
+    :param sheet_name: 工作表名称，例如 "Sheet1"
+    :param row: 行号（从 1 开始)
+    :param col: 列号（从 1 开始)
+    :param value: 要写入的内容
+    """
+
+    client = get_google_client()
+    try:
+        sheet = client.open(spreadsheet_name).worksheet(sheet_name)
+        sheet.update_cell(row, col, value)
+        print(f"✅ 已更新 {sheet_name} 的单元格 ({row}, {col}) -> {value}")
+
+    except Exception as e:
+        print("❌ 更新失败:", e)
+
 # 主程序
 if __name__ == '__main__':
     table = 'ELFCAM-Database'
