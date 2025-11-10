@@ -241,7 +241,7 @@ def main():
                     #logging.info(info, idx)
                     update = True
                     rows[idx-1][index_dict[change_key]] = info
-                    rows[idx-1][index_dict.get("image")] = "=IMAGE(" + '"' + rows[idx-1][index_dict.get("main_image")] + '"' + ")"
+
                     # verify: 读回 meta 值并打印
                     cur.execute("""
                         SELECT meta_key, meta_value FROM wp_postmeta
@@ -295,7 +295,12 @@ def main():
 
 
     if update:
-        write_and_upload_csv(rows,"csv/csv.csv", "Website-Price", "Elfcam", header)
+        new_rows = []
+        for row in rows:
+
+            row[index_dict.get("image")] = "=IMAGE(" + '"' +row[index_dict.get("main_image")] + '"' + ")"
+            new_rows.append(row)
+        write_and_upload_csv(new_rows,"csv/csv.csv", "Website-Price", "Elfcam", header)
 
 if __name__ == "__main__":
     main()
