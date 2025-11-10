@@ -242,7 +242,8 @@ def main():
                     #logging.info(info, idx)
 
                     #rows[idx-1][index_dict[change_key]] = info
-                    update_google_sheet_cell("Website-Price", "Elfcam", int(idx-1), int(index_dict[change_key]), info)
+                    update_google_sheet_cell("Website-Price", "Elfcam", int(idx-1), int(index_dict[change_key]) + 1, info)
+                    logging.info("Updating google sheets")
                     # verify: 读回 meta 值并打印
                     cur.execute("""
                         SELECT meta_key, meta_value FROM wp_postmeta
