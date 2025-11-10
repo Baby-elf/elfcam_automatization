@@ -238,9 +238,10 @@ def main():
                     info = "Row " + str(idx) + ": [OK] committed in " + now_str
                     # commit
                     conn.commit()
-                    logging.info(info, idx)
+                    #logging.info(info, idx)
                     update = True
                     rows[idx-1][index_dict[change_key]] = info
+                    rows[idx-1][index_dict.get("image")] = "=IMAGE(" + '"' + rows[idx-1][index_dict.get("main_image")] + '"' + ")"
                     # verify: 读回 meta 值并打印
                     cur.execute("""
                         SELECT meta_key, meta_value FROM wp_postmeta

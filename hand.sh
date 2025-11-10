@@ -1,1 +1,2 @@
 bash -x /root/elfcam_automatization/run_push_price_to_website.sh
+
